@@ -42,10 +42,16 @@ A tinykeymap is exited (1) by pressing <Esc> or (2) by timeout (see
 
 tinykeymap comes with the following pre-defined tinykeymaps:
 
-    tabs    gt        :: Operate on tabs
-    windows <C-W>     :: Operate on windows
-    buffers <Leader>b :: Operate on buffers
-    undo    <Leader>u :: Operate on the |undo| tree
+    tabs    gt         :: Operate on tabs
+    windows <C-W>      :: Operate on windows
+    buffers <Leader>mb :: Operate on buffers
+    diff    <Leader>md :: Make it easier to work with |diff|s
+    filter  <Leader>mf :: Fold lines not matching some pattern (default: word 
+                         under cursor)
+    lines   <Leader>ml :: Operate on lines
+    loc     <Leader>mo :: Operate on the |location-list|
+    qfl     <Leader>mq :: Operate on the |quickfix| list
+    undo    <Leader>mu :: Operate on the |undo| tree
 
 Differences to tinymode:
 
