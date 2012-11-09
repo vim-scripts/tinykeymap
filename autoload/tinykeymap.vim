@@ -3,12 +3,12 @@
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2012-08-27.
 " @Last Change: 2012-09-10.
-" @Revision:    510
+" @Revision:    528
 
 
 if !exists('g:tinykeymap#mapleader')
     " The mapleader for some tinykeymaps.
-    let g:tinykeymap#mapleader = mapleader .'m'   "{{{2
+    let g:tinykeymap#mapleader = (exists('g:mapleader') ? g:mapleader : '#') .'#m'   "{{{2
 endif
 
 
@@ -116,7 +116,7 @@ function! tinykeymap#EnterMap(name, map, ...) "{{{3
         let warning_msg = "tinykeymap: Map already defined: ". a:name ." ". a:map
         if g:tinykeymap#conflict == 1 || g:tinykeymap#conflict == 2
             echohl WarningMsg
-            echom warningmsg
+            echom warning_msg
             echohl NONE
         endif
         if g:tinykeymap#conflict <= 1
