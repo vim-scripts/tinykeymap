@@ -3,12 +3,12 @@
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2012-08-27.
 " @Last Change: 2012-09-10.
-" @Revision:    530
+" @Revision:    578
 
 
 if !exists('g:tinykeymap#mapleader')
-    " The mapleader for some tinykeymaps.
-    let g:tinykeymap#mapleader = (exists('g:mapleader') ? g:mapleader : '\') .'m'   "{{{2
+    " The mapleader for some tinykeymaps. See also |<Leader>|.
+    let g:tinykeymap#mapleader = '<Leader>m'   "{{{2
 endif
 
 
@@ -112,23 +112,7 @@ endf
 function! tinykeymap#EnterMap(name, map, ...) "{{{3
     let options = a:0 >= 1 ? a:1 : {}
     let mode = get(options, 'mode', 'n')
-    if !empty(maparg(a:map, mode))
-        let warning_msg = "tinykeymap: Map already defined: ". a:name ." ". a:map
-        if g:tinykeymap#conflict == 1 || g:tinykeymap#conflict == 2
-            echohl WarningMsg
-            echom warning_msg
-            echohl NONE
-        endif
-        if g:tinykeymap#conflict <= 1
-            return
-        elseif g:tinykeymap#conflict == 4
-            throw warning_msg
-        endif
-    endif
     let buffer_local = get(options, 'buffer', 0) ? '<buffer>' : ''
-    let cmd  = mode . "map"
-    let rhs  = s:RHS(mode, ':call tinykeymap#Call('. string(a:name) .')<cr>')
-    exec cmd buffer_local a:map rhs
     if empty(buffer_local)
         let dict = s:tinykeymaps
     else
@@ -137,11 +121,61 @@ function! tinykeymap#EnterMap(name, map, ...) "{{{3
         endif
         let dict = b:tinykeymaps
     endif
+    if !empty(maparg(a:map, mode))
+        let warning_msg = "tinykeymap: Map already defined: ". a:name ." ". a:map
+        if g:tinykeymap#conflict == 1 || g:tinykeymap#conflict == 2
+            echohl WarningMsg
+            echom warning_msg
+            echohl NONE
+        endif
+        if g:tinykeymap#conflict <= 1
+            let dict[a:name] = {}
+            return
+        elseif g:tinykeymap#conflict == 4
+            throw warning_msg
+        endif
+    endif
+    let cmd  = mode . "map"
+    let rhs  = s:RHS(mode, ':call tinykeymap#Call('. string(a:name) .')<cr>')
+    exec cmd buffer_local a:map rhs
     let options.map = a:map
     if !has_key(options, 'name')
         let options.name = a:name
     endif
     let dict[a:name] = {s:oid : copy(options)}
+endf
+
+
+" Show information on loaded tinykeymaps.
+function! tinykeymap#Info(show_all) "{{{3
+    let dict = copy(s:tinykeymaps)
+    if exists('b:tinykeymaps')
+        let dict = extend(dict, b:tinykeymaps)
+    endif
+    let msg = ['Loaded tinykeymaps:']
+    let namemaxlen = max(map(copy(dict), 'strwidth(get(get(v:val, s:oid, {}), "name", v:key))'))
+    for [name, values] in items(dict)
+        let options = get(values, s:oid, {})
+        let myname = get(options, 'name', name)
+        if a:show_all
+            call add(msg, printf('-- %s %s', myname, repeat('-', max([1, &columns - strwidth(myname) - 5]))))
+        else
+            let myopts = []
+        endif
+        for [optname, optvalue] in items(options)
+            if a:show_all
+                call add(msg, printf("  %10s: %s", optname, string(optvalue)))
+            elseif index(['name', 'message', 'start', 'stop', 'after'], optname) == -1
+                call add(myopts, printf("%s: %s", optname, string(optvalue)))
+            endif
+        endfor
+        if !a:show_all
+            call add(msg, printf("%". (namemaxlen + 1) ."s: %s", myname, join(myopts, ', ')))
+        endif
+    endfor
+    echo join(msg, "\n")
+    call tinykeymap#PressEnter()
+    redraw
 endf
 
 
@@ -174,6 +208,10 @@ endf
 "   [expr]
 function! tinykeymap#Map(name, map, expr, ...) "{{{3
     let dict = s:GetDict(a:name)
+    if empty(dict)
+        " A map was defined but due to a conflict it will be ignored
+        return
+    endif
     if type(a:map) == 1
         let map = split(a:map, '^\(<[[:alpha:]-]\+>\)\zs\|\zs')
     elseif type(a:map) == 3
