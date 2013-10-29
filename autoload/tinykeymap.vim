@@ -3,7 +3,7 @@
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2012-08-27.
 " @Last Change: 2012-09-10.
-" @Revision:    578
+" @Revision:    602
 
 
 if !exists('g:tinykeymap#mapleader')
@@ -37,6 +37,13 @@ if !exists('g:tinykeymap#resolution')
 endif
 
 
+if !exists('g:tinykeymap#autokey_msecs')
+    " if a tinykeymap has an autokey option, use |feedkey()| to simulate 
+    " a key press every N milliseconds.
+    let g:tinykeymap#autokey_msecs = 5000   "{{{2
+endif
+
+
 if !exists('g:tinykeymap#message_fmt')
     " The format string (see |printf()|) for the tinykeymap message. This 
     " format string must contain 2 %s: The first one is for the map's 
@@ -50,6 +57,11 @@ if !exists('g:tinykeymap#show_message')
     "     cmdline (default value)
     "     statusline
     let g:tinykeymap#show_message = 'cmdline'   "{{{2
+endif
+
+
+if !exists('g:tinykeymap#debug')
+    let g:tinykeymap#debug = 0
 endif
 
 
@@ -94,17 +106,22 @@ endf
 " for processing via |feedkeys()|.
 "
 " Options may contain the following keys:
-"   mode ... A map mode (see |maparg()|)
-"   buffer ... Make the tinykeymap buffer-local
-"   message ... An expression that returns a message string (the string 
-"       will be shortened if necessary
-"   start ... An expression |:execute|d before entering the map
-"   stop ... An expression |:execute|d after leaving the map
-"   after ... An execute |:execute|d after processing a character
-"   timeout ... Map-specific value for |g:tinykeymap#timeout|
-"   resolution ... Map-specific value for |g:tinykeymap#resolution|
-"   unknown_key ... Function to handle unknown keys
+"   mode ............ A map mode (see |maparg()|)
+"   buffer .......... Make the tinykeymap buffer-local
+"   message ......... An expression that returns a message string (the 
+"                     string will be shortened if necessary
+"   start ........... An expression |:execute|d before entering the map
+"   stop ............ An expression |:execute|d after leaving the map
+"   after ........... An execute |:execute|d after processing a 
+"                     character
+"   timeout ......... Map-specific value for |g:tinykeymap#timeout|
+"   resolution ...... Map-specific value for |g:tinykeymap#resolution|
+"   unknown_key ..... Function to handle unknown keys
 "   disable_count ... If true, numeric values are handled as characters
+"   autokey ......... Simulate a keypress every autokey_msecs 
+"                     milliseconds
+"   autokey_msecs ... Milliseconds between simulate "autokey" presses 
+"                     (default: |g:tinykeymap#autokey_msecs|)
 "
 " CAUTION: Currently only normal mode maps (mode == "n") are supported. 
 " It is possible to define other type of maps but the behaviour is 
@@ -121,7 +138,7 @@ function! tinykeymap#EnterMap(name, map, ...) "{{{3
         endif
         let dict = b:tinykeymaps
     endif
-    if !empty(maparg(a:map, mode))
+    if !empty(maparg(a:map, mode)) && maparg(a:map, mode) != ":call tinykeymap#Call('".a:name. "')<CR>"
         let warning_msg = "tinykeymap: Map already defined: ". a:name ." ". a:map
         if g:tinykeymap#conflict == 1 || g:tinykeymap#conflict == 2
             echohl WarningMsg
@@ -166,7 +183,11 @@ function! tinykeymap#Info(show_all) "{{{3
             if a:show_all
                 call add(msg, printf("  %10s: %s", optname, string(optvalue)))
             elseif index(['name', 'message', 'start', 'stop', 'after'], optname) == -1
-                call add(myopts, printf("%s: %s", optname, string(optvalue)))
+                if optname == 'map'
+                    call insert(myopts, printf("%s: %s", optname, string(optvalue)),0)
+                else
+                    call add(myopts, printf("%s: %s", optname, string(optvalue)))
+                endif
             endif
         endfor
         if !a:show_all
@@ -351,8 +372,15 @@ function! tinykeymap#Call(name) "{{{3
     endif
     try
         let keys = []
-        let timeout = get(options, 'timeout', g:tinykeymap#timeout)
         let resolution = get(options, 'resolution', g:tinykeymap#resolution)
+        let autokey = get(options, 'autokey', '')
+        if empty(autokey)
+            let timeout = get(options, 'timeout', g:tinykeymap#timeout)
+            let autokey_msecs = 0
+        else
+            let timeout = 0
+            let autokey_msecs = get(options, 'autokey_msecs', g:tinykeymap#autokey_msecs)
+        endif
         while timeout == 0 || time < timeout
             let key = getchar(0)
             " TLogVAR key
@@ -379,6 +407,10 @@ function! tinykeymap#Call(name) "{{{3
                 echohl NONE
                 exec 'sleep' resolution
                 let time += resolution
+                if autokey_msecs > 0 && time > autokey_msecs
+                    call feedkeys(autokey)
+                    let time = 0
+                endif
             elseif type(key) == 0 && key == 27
                 " TLogVAR "<esc>"
                 break
@@ -502,6 +534,9 @@ function! s:ProcessKey(name, keys, options) "{{{3
     " TLogVAR chars
     let handle_key = s:CheckChars(dict, chars)
     " TLogVAR handle_key
+    if g:tinykeymap#debug
+        echom "tinykeymaps: handle_key:" a:name string(a:keys) handle_key
+    endif
     if handle_key > 0
         let def = s:GetMapDef(dict, chars)
         let expr = def.expr
@@ -524,6 +559,9 @@ function! s:ProcessKey(name, keys, options) "{{{3
         endif
         let s:count = ''
         let expr = substitute(expr, '\V<lt>', '<', 'g')
+        if g:tinykeymap#debug
+            echom "tinykeymaps: expr:" expr s:count
+        endif
         " TLogVAR iterations, expr
         if !empty(expr)
             if has_key(a:options, 'before')
@@ -555,6 +593,9 @@ function! s:ProcessKey(name, keys, options) "{{{3
         let status = 0
     endif
     " TLogVAR status
+        if g:tinykeymap#debug
+            echom "tinykeymaps: status:" status
+        endif
     return status
 endf
 
